@@ -113,6 +113,7 @@ class PreFlightFrame(wx.Frame):
         'LAND_PITCH_CD' : -50,
         'LAND_WING_LEVEL' : 0,
         'LOG_BITMASK' : 65535,
+        'RALLY_LIMIT_KM' : 1,
         'SKIP_GYRO_CAL' : 0,
         'STICK_MIXING' : 0,
         'TECS_LAND_ARSPD' : 16,
