@@ -84,12 +84,12 @@ class PreFlightFrame(wx.Frame):
     #  this will result in endless re-requests unless commented out
     PARAMS_FIXED = {
         'ACS_WATCH_HB' : 1,
-        'AHRS_EKF_USE' : 0,
+        'AHRS_EKF_USE' : 1,
         'AHRS_ORIENTATION' : 0,
         'ALT_MIX' : 1,
         'ARMING_CHECK' : 1,
         'ARMING_DIS_RUD' : 1,
-        'ARMING_REQUIRE' : 1,
+        'ARMING_REQUIRE' : 2,
         'ARSPD_FBW_MAX' : 25,
         'ARSPD_FBW_MIN' : 15,
         'COMPASS_EXTERNAL' : 1,
