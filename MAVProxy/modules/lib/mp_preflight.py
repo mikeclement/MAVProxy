@@ -214,6 +214,7 @@ class PreFlightFrame(wx.Frame):
         # Variables to handle requests of parameters
         self.params_waiting = {}  # Requested params (false = received)
         self.params_lastseen = time.time()  # Last time we saw any param
+        self.params_times_askedfor = {} # Number of times we've asked for this param
 
         #use tabs for the individual checklists
         self.panel = wx.Panel(self)
@@ -633,6 +634,9 @@ class PreFlightFrame(wx.Frame):
         # Note that we're now waiting for all params
         self.params_waiting = {k:True for k in self.params_waiting}
 
+        # Reset the "asked for" counters:
+        self.params_times_askedfor = {}
+
         # Reset visible state of all widgets
         for k in self.params_wgt:
             self.params_wgt[k].SetLabel(PreFlightFrame.PLACEHOLDER_TEXT)
@@ -663,6 +667,15 @@ class PreFlightFrame(wx.Frame):
         # Re-request any missing params
         if time.time() > self.params_lastseen + 2.0:
             for p in [p for p in self.params_waiting if self.params_waiting[p]]:
+                #Don't keep asking for it if it ain't there:
+                # no need to spam endlessly.
+                if p not in self.params_times_askedfor:
+                    self.params_times_askedfor[p] = 0
+                else:
+                    self.params_times_askedfor[p] += 1
+                if self.params_times_askedfor[p] >= 3:
+                    continue
+
                 print "preflight: re-requesting param " + p
                 self.state.child_pipe.send(NameValue("param", p))
 
