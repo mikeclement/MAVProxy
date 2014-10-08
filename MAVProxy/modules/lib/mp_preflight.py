@@ -73,11 +73,15 @@ class PreFlightFrame(wx.Frame):
     SMALL = 5
     LARGE = 15
     PLACEHOLDER_TEXT = "xxxxxx"
-    FULL_SIZE = (750, 900)
-    HALF_SIZE = (FULL_SIZE[0]/2, FULL_SIZE[1]-80)
+    WINDOW_SIZE = (750, 600)
+    COLUMN_COUNT = 2
+    PARAMS_PER_COLUMN = 30  # NOTE: adjust after changing size/columns
 
     # Degrees that aircraft must be rotated about axes to test IMU
     MIN_DEGREES = 30
+
+    # Calculated UI values
+    COLUMN_SIZE = (int(WINDOW_SIZE[0]/COLUMN_COUNT), WINDOW_SIZE[1]-80)
 
     # Parameters with expected (fixed) values
     # Note: some are ACS-specific and won't be in master branch,
@@ -200,7 +204,7 @@ class PreFlightFrame(wx.Frame):
 
     def __init__(self, state, title, no_timer=False):
         self.state = state
-        wx.Frame.__init__(self, None, title=title, size=PreFlightFrame.FULL_SIZE,
+        wx.Frame.__init__(self, None, title=title, size=PreFlightFrame.WINDOW_SIZE,
                           style=wx.DEFAULT_FRAME_STYLE ^ wx.RESIZE_BORDER)
 
         # Place to store parameter widgets used in GUI
@@ -299,39 +303,47 @@ class PreFlightFrame(wx.Frame):
     def createWidgets(self):
         '''create controls on form - labels, buttons, etc'''
 
-        # Parameter verification panel
+        # Parameter verification panel(s)
+        # Generate as many columns/pages as needed to fit all parameters
 
-        pnl, box = self.createPanelBox("Parameter Verification")
+        params = sorted(PreFlightFrame.PARAMS_FIXED.keys())
+        page_count = 0
+        while len(params) > 0:
+            page_count += 1
+            pnl, box = self.createPanelBox("Parameter Verification (%d)" % page_count)
+            subbox = wx.BoxSizer(wx.HORIZONTAL)
 
-        box_l = wx.BoxSizer(wx.VERTICAL)
-        box_l.SetMinSize(wx.Size(*PreFlightFrame.HALF_SIZE))
-        box_r = wx.BoxSizer(wx.VERTICAL)
-        box_r.SetMinSize(wx.Size(*PreFlightFrame.HALF_SIZE))
-        param_count_half = math.ceil(len(PreFlightFrame.PARAMS_FIXED) / 2.0)
-        for p in sorted(PreFlightFrame.PARAMS_FIXED):
-            if param_count_half > 0:
-                self.createParamLabel(pnl, box_l, p)
-                param_count_half -= 1
-            else:
-                self.createParamLabel(pnl, box_r, p)
-        subbox = wx.BoxSizer(wx.HORIZONTAL)
-        subbox.Add(box_l)
-        subbox.Add(box_r)
-        box.Add(subbox)
-        box.AddSpacer(PreFlightFrame.LARGE)
+            for col in range(PreFlightFrame.COLUMN_COUNT):
+                box_col = wx.BoxSizer(wx.VERTICAL)
+                box_col.SetMinSize(wx.Size(*PreFlightFrame.COLUMN_SIZE))
 
-        self.createButtonRow(pnl, box,
-                             [("Proceed to Mission Config", self.btn_NextPage),
-                              ("Refresh Data", self.btn_Refresh)])
+                for prm in range(PreFlightFrame.PARAMS_PER_COLUMN):
+                    self.createParamLabel(pnl, box_col, params[0])
+                    params = params[1:]
+
+                    if len(params) <= 0:
+                        break
+
+                subbox.Add(box_col)
+
+                if len(params) <= 0:
+                    break
+
+            box.Add(subbox)
+            box.AddSpacer(PreFlightFrame.LARGE)
+
+            self.createButtonRow(pnl, box,
+                                 [("Proceed to Next Page", self.btn_NextPage),
+                                  ("Refresh Data", self.btn_Refresh)])
 
         # Mission configuration panel
 
         pnl, box = self.createPanelBox("Mission Configuration")
 
         box_l = wx.BoxSizer(wx.VERTICAL)
-        box_l.SetMinSize(wx.Size(*PreFlightFrame.HALF_SIZE))
+        box_l.SetMinSize(wx.Size(*PreFlightFrame.COLUMN_SIZE))
         box_r = wx.BoxSizer(wx.VERTICAL)
-        box_r.SetMinSize(wx.Size(*PreFlightFrame.HALF_SIZE))
+        box_r.SetMinSize(wx.Size(*PreFlightFrame.COLUMN_SIZE))
 
         wgt = wx.StaticText(pnl, wx.ID_ANY, "Confirm and deconflict waypoints, rally, and fence")
         box_l.Add(wgt)
@@ -410,7 +422,7 @@ class PreFlightFrame(wx.Frame):
         box.AddSpacer(PreFlightFrame.LARGE)
 
         self.createButtonRow(pnl, box,
-                             [("Proceed to Final Checks", self.btn_NextPage),
+                             [("Proceed to Next Page", self.btn_NextPage),
                               ("Refresh Data", self.btn_Refresh)])
         
         # Aircraft Final Run-Up panel
