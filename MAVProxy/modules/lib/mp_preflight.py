@@ -61,7 +61,7 @@ class PreFlightUI():
                 nv = self.parent_pipe.recv()
                 if isinstance(nv, NameValue):
                     return (nv.name, nv.value)
-        return None
+        return (None, None)
        
         
 class PreFlightFrame(wx.Frame):
