@@ -70,18 +70,19 @@ class PreFlightFrame(wx.Frame):
     # Fixed values for the UI
     RED = (255,0,0)
     GREEN = (0,200,0)
+    BLACK = (0, 0, 0)
     SMALL = 5
     LARGE = 15
     PLACEHOLDER_TEXT = "xxxxxx"
-    WINDOW_SIZE = (750, 600)
+    WINDOW_SIZE = (750, 625)
     COLUMN_COUNT = 2
     PARAMS_PER_COLUMN = 30  # NOTE: adjust after changing size/columns
 
     # Degrees that aircraft must be rotated about axes to test IMU
     MIN_DEGREES = 30
 
-    # Calculated UI values
-    COLUMN_SIZE = (int(WINDOW_SIZE[0]/COLUMN_COUNT), WINDOW_SIZE[1]-80)
+    # Calculated UI values (retune if WINDOW_SIZE changes)
+    COLUMN_SIZE = (int(WINDOW_SIZE[0]/COLUMN_COUNT), WINDOW_SIZE[1]-105)
 
     # Parameters with expected (fixed) values
     # Note: some are ACS-specific and won't be in master branch,
@@ -232,7 +233,9 @@ class PreFlightFrame(wx.Frame):
         
         # finally, put the notebook in a sizer for the panel to manage
         # the layout
-        sizer = wx.BoxSizer()
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        self.createParamLabel(self.panel, sizer, 'SYSID_THISMAV')
+        sizer.AddSpacer(PreFlightFrame.SMALL)
         sizer.Add(self.nb, 1, wx.EXPAND)
         self.panel.SetSizer(sizer)
   
@@ -699,6 +702,8 @@ class PreFlightFrame(wx.Frame):
                             self.params_wgt[param].SetForegroundColour(PreFlightFrame.GREEN)
                         else:
                             self.params_wgt[param].SetForegroundColour(PreFlightFrame.RED)
+                    elif param == 'SYSID_THISMAV':
+                        self.params_wgt[param].SetForegroundColour(PreFlightFrame.BLACK)
                     elif param == 'FENCE_MINALT':
                         self.txt_FenceMinTakeoff_Change()
                     elif param in ['FENCE_RETALT', 'ALT_HOLD_RTL']:
