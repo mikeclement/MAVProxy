@@ -76,10 +76,7 @@ class PreFlightModule(mp_module.MPModule):
                 self.master.param_fetch_all()
 
             elif name == "param":
-                if value in self.master.params:
-                    self.preflight.send_value("param", (name, self.master.params[name]))
-                else:
-                    self.master.param_fetch_one(name)
+                self.master.param_fetch_one(name)
 
 def init(mpstate):
     '''initialise module'''

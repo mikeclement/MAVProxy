@@ -84,6 +84,10 @@ class PreFlightFrame(wx.Frame):
     # Calculated UI values (retune if WINDOW_SIZE changes)
     COLUMN_SIZE = (int(WINDOW_SIZE[0]/COLUMN_COUNT), WINDOW_SIZE[1]-105)
 
+    # Control over retry mechanism
+    RETRY_TIMEOUT = 5.0     # Time to wait after not seeing any data
+    RETRY_MAX_PARAMS = 5    # Maximum parameters to re-request at once
+
     # Parameters with expected (fixed) values
     # Note: some are ACS-specific and won't be in master branch,
     #  this will result in endless re-requests unless commented out
@@ -92,7 +96,7 @@ class PreFlightFrame(wx.Frame):
         'ACS_WATCH_HB' : 1,
         'AHRS_EKF_USE' : 1,
         'AHRS_ORIENTATION' : 0,
-        'ALT_HOLD_RTL' : 100,
+        #'ALT_HOLD_RTL' : 100,    # Used in Mission Config, current code can't use in both places
         'ALT_MIX' : 1,
         'ARMING_CHECK' : 1,
         'ARMING_DIS_RUD' : 1,
@@ -153,7 +157,7 @@ class PreFlightFrame(wx.Frame):
         'PTCH2SRV_RLL' : 1.1,
         'PTCH2SRV_RMAX_DN' : 0,
         'PTCH2SRV_RMAX_UP' : 0,
-        'PTCH2SRV_TCONST' : 0.5,
+        'PTCH2SRV_TCONST' : 0.3,
         'RALLY_LIMIT_KM' : 3,
         'RLL2SRV_D' : 0.045,
         'RLL2SRV_I' : 0.25,
@@ -178,7 +182,7 @@ class PreFlightFrame(wx.Frame):
         'TECS_SPDWEIGHT' : 1,
         'TECS_SPD_OMEGA' : 2,
         'TECS_THR_DAMP' : 0.5,
-        'TECS_TIME_CONST' : 7,
+        'TECS_TIME_CONST' : 3,
         'TECS_VERT_ACC' : 7,
         'TERRAIN_ENABLE' : 0,
         'TERRAIN_FOLLOW' : 0,
@@ -196,11 +200,12 @@ class PreFlightFrame(wx.Frame):
         'TRIM_THROTTLE' : 45
     }
 
-    # Parameters with minimum values
-    PARAMS_MIN = {
-        'FENCE_TOTAL' : 4,
-        'MIS_TOTAL' : 2,
-        'RALLY_TOTAL' : 1
+    # Parameters with (min, max) values
+    # For no-min or no-max, use obscenely low/high numbers
+    PARAMS_BOUNDS = {
+        'FENCE_TOTAL' : (4, 10000),
+        'MIS_TOTAL' : (2, 10000),
+        'RALLY_TOTAL' : (1, 1)
     }
 
     def __init__(self, state, title, no_timer=False):
@@ -211,10 +216,9 @@ class PreFlightFrame(wx.Frame):
         # Place to store parameter widgets used in GUI
         self.params_wgt = {}
 
-        # Variables to handle requests of parameters
+        # Variables to handle requests of data
         self.params_waiting = {}  # Requested params (false = received)
-        self.params_lastseen = time.time()  # Last time we saw any param
-        self.params_times_askedfor = {} # Number of times we've asked for this param
+        self.data_lastseen = time.time()  # Last time we saw any param
 
         #use tabs for the individual checklists
         self.panel = wx.Panel(self)
@@ -412,7 +416,7 @@ class PreFlightFrame(wx.Frame):
         box_r.AddSpacer(PreFlightFrame.SMALL)
 
         self.txt_BattCapacity = self.createTextboxLabel(pnl, box_r,
-                                    "Single battery capacity (mAh, for 2 batts)",
+                                    "Single battery capacity (mAh)",
                                     self.txt_BattCapacity_Change)
         box_r.AddSpacer(PreFlightFrame.SMALL)
         self.createParamLabel(pnl, box_r, 'BATT_CAPACITY')
@@ -629,13 +633,10 @@ class PreFlightFrame(wx.Frame):
     def btn_Refresh(self, event):
         '''Reload all params, etc (useful when multiple MAVProxies used)'''
         # Reset the re-request timer
-        self.params_lastseen = time.time()
+        self.data_lastseen = time.time()
 
         # Note that we're now waiting for all params
         self.params_waiting = {k:True for k in self.params_waiting}
-
-        # Reset the "asked for" counters:
-        self.params_times_askedfor = {}
 
         # Reset visible state of all widgets
         for k in self.params_wgt:
@@ -664,33 +665,26 @@ class PreFlightFrame(wx.Frame):
             self.Destroy()
             return
 
-        # Re-request any missing params
-        if time.time() > self.params_lastseen + 2.0:
-            for p in [p for p in self.params_waiting if self.params_waiting[p]]:
-                #Don't keep asking for it if it ain't there:
-                # no need to spam endlessly.
-                if p not in self.params_times_askedfor:
-                    self.params_times_askedfor[p] = 0
-                else:
-                    self.params_times_askedfor[p] += 1
-                if self.params_times_askedfor[p] >= 3:
-                    continue
-
-                print "preflight: re-requesting param " + p
+        # Re-request any missing data after a timeout
+        if time.time() > self.data_lastseen + PreFlightFrame.RETRY_TIMEOUT:
+            # Check if any params are missing, and re-request a few of them
+            for p in [p for p in self.params_waiting \
+                      if self.params_waiting[p]][:PreFlightFrame.RETRY_MAX_PARAMS]:
+                #print "preflight: re-requesting param " + p
                 self.state.child_pipe.send(NameValue("param", p))
 
             # Also check if rally points are missing
             if self.lbl_rally_alt.GetLabelText() == PreFlightFrame.PLACEHOLDER_TEXT:
-                print "preflight: re-requesting rally point(s)"
+                #print "preflight: re-requesting rally point(s)"
                 self.state.child_pipe.send(NameValue("cmd", "rally list"))
 
             # Also check if waypoints are missing
             if self.lbl_takeoff_alt.GetLabelText() == PreFlightFrame.PLACEHOLDER_TEXT:
-                print "preflight: re-requesting waypoint(s)"
+                #print "preflight: re-requesting waypoint(s)"
                 self.state.child_pipe.send(NameValue("cmd", "wp list"))
 
             # Delay before another re-request
-            self.params_lastseen = time.time()
+            self.data_lastseen = time.time()
 
         # Process any queued messages (see mavproxy_preflight.py)
         while state.child_pipe.poll():
@@ -700,18 +694,21 @@ class PreFlightFrame(wx.Frame):
 
             if obj.name == "param":
                 # Params still arriving, delay re-requesting
-                self.params_lastseen = time.time()
+                self.data_lastseen = time.time()
+
                 param, value = obj.value
                 param = str(param)
                 value = "%0.03f" % value
+
                 if param not in self.params_wgt:
                     return
                 if param not in PreFlightFrame.PARAMS_FIXED:
-                    # params with no expected value
+                    # params with no fixed value
                     self.params_wgt[param].SetLabel(value)
                     # handle special cases
-                    if param in PreFlightFrame.PARAMS_MIN:
-                        if float(value) >= PreFlightFrame.PARAMS_MIN[param]:
+                    if param in PreFlightFrame.PARAMS_BOUNDS:
+                        if float(value) >= PreFlightFrame.PARAMS_BOUNDS[param][0] and \
+                           float(value) <= PreFlightFrame.PARAMS_BOUNDS[param][1]:
                             self.params_wgt[param].SetForegroundColour(PreFlightFrame.GREEN)
                         else:
                             self.params_wgt[param].SetForegroundColour(PreFlightFrame.RED)
