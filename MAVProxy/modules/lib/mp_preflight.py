@@ -225,6 +225,9 @@ class PreFlightFrame(wx.Frame):
         self.params_waiting = {}  # Requested params (false = received)
         self.data_lastseen = time.time()  # Last time we saw any param
 
+        # Store some data we use to make determinations
+        self.airspeed_history = [0.0] * 20
+
         #use tabs for the individual checklists
         self.panel = wx.Panel(self)
         self.nb = wx.Choicebook(self.panel, wx.ID_ANY)
@@ -453,7 +456,7 @@ class PreFlightFrame(wx.Frame):
         box.Add(subbox)
         box.AddSpacer(PreFlightFrame.LARGE)
 
-        wgt = wx.StaticText(pnl, wx.ID_ANY, "Check that -2 m/s < airspeed < 2 m/s when still, and that it registers positive airspeed")
+        wgt = wx.StaticText(pnl, wx.ID_ANY, "Check that -2 m/s < airspeed < 2 m/s when still, and that it registers positive airspeed\nBE SURE THIS NUMBER IS GREEN WHEN DONE BEFORE PROCEEDING.")
         box.Add(wgt)
         box.AddSpacer(PreFlightFrame.SMALL)
 
@@ -602,6 +605,8 @@ class PreFlightFrame(wx.Frame):
         self.lbl_zeroize.SetLabel("Waiting")
         self.lbl_zeroize.SetForegroundColour(PreFlightFrame.RED)
         self.state.child_pipe.send(NameValue("cmd", "calpress"))
+        # Reset airspeed history
+        self.airspeed_history = [0.0] * 20
 
     def btn_Arm(self, event):
         '''arm throttle'''
@@ -755,8 +760,16 @@ class PreFlightFrame(wx.Frame):
                 self.lbl_zeroize.SetForegroundColour(PreFlightFrame.GREEN)
 
             elif obj.name == "airspeed":
-                self.lbl_airspeed.SetLabel(str(int(obj.value)))
-                if -2.0 < obj.value < 2.0:
+                # Story airspeed history for some number of samples,
+                # to make sure a good calibration happened (bad calibration
+                # will result in flatline-zero readings)
+                self.airspeed_history.append(obj.value)
+                self.airspeed_history = self.airspeed_history[1:]
+                as_var = max(self.airspeed_history) - min(self.airspeed_history)
+                #print "%0.03f %0.03f" % (obj.value, as_var)
+
+                self.lbl_airspeed.SetLabel("%0.03f" % obj.value)
+                if -2.0 < obj.value < 2.0 and 0.1 <= as_var <= 4.0:
                     self.lbl_airspeed.SetForegroundColour(PreFlightFrame.GREEN)
                 else:
                     self.lbl_airspeed.SetForegroundColour(PreFlightFrame.RED)
