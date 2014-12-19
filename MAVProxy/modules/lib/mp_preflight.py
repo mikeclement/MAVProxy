@@ -456,7 +456,7 @@ class PreFlightFrame(wx.Frame):
         box.Add(subbox)
         box.AddSpacer(PreFlightFrame.LARGE)
 
-        wgt = wx.StaticText(pnl, wx.ID_ANY, "Check that -2 m/s < airspeed < 2 m/s when still, and that it registers positive airspeed\nBE SURE THIS NUMBER IS GREEN WHEN DONE BEFORE PROCEEDING.")
+        wgt = wx.StaticText(pnl, wx.ID_ANY, "Check that -4 m/s < airspeed < 4 m/s when still, and that it registers positive airspeed\nBE SURE THIS NUMBER IS GREEN WHEN DONE BEFORE PROCEEDING.")
         box.Add(wgt)
         box.AddSpacer(PreFlightFrame.SMALL)
 
@@ -769,7 +769,7 @@ class PreFlightFrame(wx.Frame):
                 #print "%0.03f %0.03f" % (obj.value, as_var)
 
                 self.lbl_airspeed.SetLabel("%0.03f" % obj.value)
-                if -2.0 < obj.value < 2.0 and 0.1 <= as_var <= 4.0:
+                if abs(obj.value) < 4.0 and 0.1 <= as_var <= 4.0:
                     self.lbl_airspeed.SetForegroundColour(PreFlightFrame.GREEN)
                 else:
                     self.lbl_airspeed.SetForegroundColour(PreFlightFrame.RED)
